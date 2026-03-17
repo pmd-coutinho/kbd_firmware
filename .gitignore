@@ -3,3 +3,4 @@
 
 # idea
 .idea/*
+/keyboards/crkbd/qmk/qmk_firmware/.build/crkbd_rev4_1_standard_pedro.uf2
