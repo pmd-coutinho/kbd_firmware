@@ -9,9 +9,10 @@
 #define PERMISSIVE_HOLD
 #define CHORDAL_HOLD
 
-// --- Combos --- 
+// --- Combos ---
 #define COMBO_COUNT 30
 #define COMBO_TERM 30
+#define COMBO_TERM_PER_COMBO
 // Only fire combo if both keys pressed within COMBO_HOLD_TERM and no key
 // was tapped in the prior COMBO_MUST_IDLE_MS window.
 // This prevents misfires during fast rolls (urob's require-prior-idle equivalent).
@@ -24,6 +25,9 @@
 // --- One-shot mods ---
 #define ONESHOT_TAP_TOGGLE 0  // Disable lock on double-tap (prevents stuck shift)
 #define ONESHOT_TIMEOUT 900
+
+// --- Flow Tap (urob's require-prior-idle-ms for HRMs) ---
+#define FLOW_TAP_TERM 150
 
 // --- Encoders ---
 #define ENCODER_RESOLUTION 4

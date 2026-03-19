@@ -4,3 +4,6 @@
 [submodule "src/vial-kb/vial-qmk"]
 	path = src/vial-kb/vial-qmk
 	url = https://github.com/vial-kb/vial-qmk.git
+[submodule "src/qmk-modules/getreuer"]
+	path = src/qmk-modules/getreuer
+	url = https://github.com/getreuer/qmk-modules.git

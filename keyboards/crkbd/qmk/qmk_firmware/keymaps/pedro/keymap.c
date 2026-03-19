@@ -11,7 +11,8 @@ enum layers { _DEF, _NAV, _FN, _NUM, _SYS };
 
 enum custom_keycodes {
     NAV_LEFT = SAFE_RANGE, NAV_RIGHT, NAV_UP, NAV_DOWN,
-    NAV_BSPC, NAV_DEL, ALT_TAB, QEXCL,
+    NAV_BSPC, NAV_DEL, ALT_TAB, QEXCL, LPAR_LT, RPAR_GT,
+    SMART_NUM,
 };
 
 // Home row mods (GASC)
@@ -27,7 +28,6 @@ enum custom_keycodes {
 // Thumbs
 #define LT_SPC LT(_NAV, KC_SPC)
 #define LT_ENT LT(_FN, KC_ENT)
-#define LT_NUM MO(_NUM)
 
 // Tap dance IDs
 enum {
@@ -54,6 +54,9 @@ enum {
 #define HN_5   LSFT_T(KC_5)
 #define HN_6   LCTL_T(KC_6)
 
+// Forward declaration for layer_state_set_user
+static bool num_word_active;
+
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
     // Base: QWERTY (symbols on combos, mod-morphs on , . /)
@@ -61,14 +64,20 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
         XXXXXXX, KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,      KC_MUTE, KC_BTN3,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,    XXXXXXX,
         XXXXXXX, HM_A,    HM_S,    HM_D,    HM_F,    KC_G,      KC_BSLS, KC_GRV,     KC_H,    HM_J,    HM_K,    HM_L,    HM_SC,   KC_QUOT,
         XXXXXXX, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,                             KC_N,    KC_M,    KC_COMM, KC_DOT,  QEXCL,   XXXXXXX,
-                                             KC_ESC,  LT_SPC,  LT_ENT,    LT_NUM,  TD_SHFT, KC_DEL
+                                             KC_ESC,  LT_SPC,  LT_ENT,    SMART_NUM, TD_SHFT, KC_DEL
     ),
 
-    // Nav: arrows (tap→hold = Home/End/doc-start/doc-end/word-bspc/word-del)
+    // Nav: vim HJKL arrows on home row, tap/hold for alternates
+    //
+    // Right side:
+    //   Top:  Bksp/wBksp  PgDn      PgUp      Del/wDel   ___    ___
+    //   Mid:  ← (H)       ↓ (J)     ↑ (K)     → (L)      Home   End
+    //   Bot:  Ins          wLeft     ___        wRight     ___    ___
+    //
     [_NAV] = LAYOUT_split_3x6_3_ex2(
-        _______, LALT(KC_F4), _______, S(KC_TAB), ALT_TAB, _______,  XXXXXXX, XXXXXXX,    KC_PGUP,  NAV_BSPC, NAV_UP,   NAV_DEL,  XXXXXXX, XXXXXXX,
-        _______, OSM(MOD_LGUI), OSM(MOD_LALT), OSM(MOD_LSFT), OSM(MOD_LCTL), _______,  XXXXXXX, XXXXXXX,  KC_PGDN, NAV_LEFT, NAV_DOWN, NAV_RIGHT, KC_ENT, XXXXXXX,
-        _______, _______,  _______,  _______,  _______,  _______,                          KC_INS,  KC_TAB,   _______,  _______,  _______, _______,
+        _______, LALT(KC_F4), _______, S(KC_TAB), ALT_TAB, _______,  XXXXXXX, XXXXXXX,    NAV_BSPC, KC_PGDN,  KC_PGUP,  NAV_DEL,  XXXXXXX, XXXXXXX,
+        _______, OSM(MOD_LGUI), OSM(MOD_LALT), OSM(MOD_LSFT), OSM(MOD_LCTL), _______,  XXXXXXX, XXXXXXX,  NAV_LEFT, NAV_DOWN, NAV_UP,   NAV_RIGHT, KC_HOME, KC_END,
+        _______, C(KC_Z),  C(KC_X),  C(KC_INS), S(KC_INS), _______,                          SELWBAK,  SELLINE,  SELLUP,   SELWORD,  KC_INS,  KC_TAB,
                                                _______,  _______,  _______,    _______,  KC_CANCEL, _______
     ),
 
@@ -99,25 +108,38 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 // Tri-layer: FN + NUM = SYS
 layer_state_t layer_state_set_user(layer_state_t state) {
-    return update_tri_layer_state(state, _FN, _NUM, _SYS);
+    state = update_tri_layer_state(state, _FN, _NUM, _SYS);
+    // Cancel num word if _NUM layer was turned off externally
+    if (num_word_active && !layer_state_cmp(state, _NUM)) {
+        num_word_active = false;
+    }
+    return state;
 }
 
 // ---------------------------------------------------------------------------
 // Tap Dance: Sticky Shift / Caps Word
 // ---------------------------------------------------------------------------
 // Single tap = one-shot shift (next key is shifted)
+// Single tap = sticky shift
+// Hold = regular shift (stays active while held)
 // Double tap = toggle Caps Word
-// To cancel Caps Word: tap space, enter, comma, dot, or any non-alpha/num key
 void td_sft_cw_finished(tap_dance_state_t *state, void *user_data) {
     if (state->count == 1) {
-        set_oneshot_mods(MOD_LSFT);  // Sticky shift
+        if (state->pressed) {
+            // Held: register shift (will be unregistered on reset)
+            register_code(KC_LSFT);
+        } else {
+            // Tapped: sticky shift
+            set_oneshot_mods(MOD_LSFT);
+        }
     } else if (state->count >= 2) {
-        caps_word_toggle();           // Toggle Caps Word
+        caps_word_toggle();
     }
 }
 
 void td_sft_cw_reset(tap_dance_state_t *state, void *user_data) {
-    // Nothing to clean up
+    // Unregister shift if it was held
+    unregister_code(KC_LSFT);
 }
 
 tap_dance_action_t tap_dance_actions[] = {
@@ -169,6 +191,9 @@ const uint16_t PROGMEM c_pipe[]  = {HM_L, KC_DOT, COMBO_END};
 // Caps Word
 const uint16_t PROGMEM c_capsw[] = {KC_LSFT, KC_RSFT, COMBO_END};
 
+// Compose (urob's leader key position: D+F)
+const uint16_t PROGMEM c_comp[]  = {HM_D, HM_F, COMBO_END};
+
 // Combo indices (so we can filter per-combo in combo_should_trigger)
 enum combo_indices {
     C_ESC, C_TAB,
@@ -181,7 +206,8 @@ enum combo_indices {
     C_CARET, C_PLUS, C_STAR, C_AMPS,
     C_UNDER, C_MINUS, C_FSLH, C_PIPE,
     C_CAPSW,
-    C_PAD1, C_PAD2,
+    C_COMP,
+    C_PAD1,
 };
 
 combo_t key_combos[COMBO_COUNT] = {
@@ -189,7 +215,7 @@ combo_t key_combos[COMBO_COUNT] = {
     [C_CUT]   = COMBO(c_cut,   CK_CUT),    [C_COPY]  = COMBO(c_copy,  CK_COPY),
     [C_PASTE] = COMBO(c_paste, CK_PAST),
     [C_BSPC]  = COMBO(c_bspc,  KC_BSPC),   [C_DEL]   = COMBO(c_del,   KC_DEL),
-    [C_LPAR]  = COMBO(c_lpar,  KC_LPRN),   [C_RPAR]  = COMBO(c_rpar,  KC_RPRN),
+    [C_LPAR]  = COMBO(c_lpar,  LPAR_LT),   [C_RPAR]  = COMBO(c_rpar,  RPAR_GT),
     [C_LBKT]  = COMBO(c_lbkt,  KC_LBRC),   [C_RBKT]  = COMBO(c_rbkt,  KC_RBRC),
     [C_AT]    = COMBO(c_at,    KC_AT),      [C_HASH]  = COMBO(c_hash,  KC_HASH),
     [C_DLLR]  = COMBO(c_dllr,  KC_DLR),    [C_PRCNT] = COMBO(c_prcnt, KC_PERC),
@@ -200,7 +226,8 @@ combo_t key_combos[COMBO_COUNT] = {
     [C_UNDER] = COMBO(c_under, KC_UNDS),    [C_MINUS] = COMBO(c_minus, KC_MINS),
     [C_FSLH]  = COMBO(c_fslh,  KC_SLSH),    [C_PIPE]  = COMBO(c_pipe,  KC_PIPE),
     [C_CAPSW] = COMBO(c_capsw, CW_TOGG),
-    [C_PAD1]  = COMBO(c_capsw, KC_NO),      [C_PAD2]  = COMBO(c_capsw, KC_NO),
+    [C_COMP]  = COMBO(c_comp,  KC_APP),     // Compose key (Menu key mapped to Compose in OS)
+    [C_PAD1]  = COMBO(c_capsw, KC_NO),
 };
 
 // ---------------------------------------------------------------------------
@@ -210,7 +237,7 @@ combo_t key_combos[COMBO_COUNT] = {
 //   ALL horizontal combos: COMBO_IDLE_FAST = 150ms
 //   ALL vertical combos:   COMBO_IDLE_SLOW = 50ms
 // ---------------------------------------------------------------------------
-#define COMBO_IDLE_FAST 150
+#define COMBO_IDLE_FAST 125
 #define COMBO_IDLE_SLOW 50
 
 static uint16_t last_keypress_time = 0;
@@ -227,6 +254,7 @@ bool combo_should_trigger(uint16_t combo_index, combo_t *combo, uint16_t keycode
         // Other horizontal combos — COMBO_IDLE_FAST (150ms)
         case C_ESC:    // W+E
         case C_TAB:    // S+D
+        case C_COMP:   // D+F (Compose)
         case C_CUT:    // X+V
         case C_COPY:   // X+C
         case C_PASTE:  // C+V
@@ -262,6 +290,20 @@ bool combo_should_trigger(uint16_t combo_index, combo_t *combo, uint16_t keycode
             return true;
     }
     return timer_elapsed(last_keypress_time) >= idle;
+}
+
+// Per-combo timing: horizontal combos get more time (50ms), vertical stay tight (30ms)
+uint16_t get_combo_term(uint16_t combo_index, combo_t *combo) {
+    switch (combo_index) {
+        case C_ESC:   case C_TAB:   case C_COMP:
+        case C_CUT:   case C_COPY:  case C_PASTE:
+        case C_LPAR:  case C_RPAR:
+        case C_LBKT:  case C_RBKT:
+        case C_BSPC:  case C_DEL:
+            return 50;
+        default:
+            return COMBO_TERM;  // 30ms for vertical combos
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -319,23 +361,101 @@ bool caps_word_press_user(uint16_t keycode) {
 }
 
 // ---------------------------------------------------------------------------
-// Nav hold-tap + Alt-Tab swapper
+// Nav cluster: tap / double-tap-hold / hold
 // ---------------------------------------------------------------------------
-static uint16_t nav_timer    = 0;
-static uint16_t nav_tap_kc   = 0;
-static bool     nav_held     = false;
-static bool     alt_tab_on   = false;
+// Single tap:          send arrow once (no repeat)
+// Double-tap and hold: arrow auto-repeats
+// Single hold:         alternate key (Home/End/Ctrl+Home/Ctrl+End/wBksp/wDel)
+//
+// Implementation: on press, start a timer. On release:
+//   - If quick (< NAV_HOLD_MS): it's a tap. Record time for double-tap detection.
+//   - If held (>= NAV_HOLD_MS) and NOT a double-tap: send alternate key.
+//   - If held (>= NAV_HOLD_MS) and IS a double-tap: arrow was repeating, just stop.
+
+// ---------------------------------------------------------------------------
+// Num Word (urob's smart_num equivalent)
+// ---------------------------------------------------------------------------
+// Tap SMART_NUM = activate num word (layer stays on until non-number key)
+// Hold SMART_NUM = momentary _NUM (like MO(_NUM))
+static bool     smart_num_held   = false;
+static uint16_t smart_num_timer  = 0;
+
+static bool is_num_word_key(uint16_t keycode) {
+    switch (keycode) {
+        case KC_1 ... KC_0:
+        case KC_MINS:
+        case KC_DOT:
+        case KC_COMM:
+        case KC_BSPC:
+        case KC_DEL:
+        case SMART_NUM:
+            return true;
+        // Allow mod-taps through (home row mods on num layer)
+        case QK_MOD_TAP ... QK_MOD_TAP_MAX:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static uint16_t nav_timer      = 0;
+static uint16_t nav_tap_kc     = 0;
+static uint16_t nav_alt_kc     = 0;
+static uint16_t nav_last_tap   = 0;     // Time of last tap release
+static uint16_t nav_last_kc    = 0;     // Keycode of last tap
+static bool     nav_repeating  = false; // True if in double-tap-hold repeat mode
+static bool     nav_holding    = false; // True if held past threshold
+static bool     alt_tab_on     = false;
 
 #define NAV_HOLD_MS 200
+#define NAV_DTAP_MS 250  // Max gap between taps for double-tap
 
 void matrix_scan_user(void) {
-    if (nav_tap_kc && !nav_held && timer_elapsed(nav_timer) > NAV_HOLD_MS) {
-        nav_held = true;
-        unregister_code(nav_tap_kc);
+    // Detect hold threshold — fire alternate key immediately
+    if (nav_tap_kc && !nav_holding && !nav_repeating &&
+        timer_elapsed(nav_timer) >= NAV_HOLD_MS) {
+        nav_holding = true;
+        tap_code16(nav_alt_kc);  // Send Home/End/etc. right now
     }
+
+    // Alt-Tab: release alt when leaving Nav layer
     if (alt_tab_on && !layer_state_is(_NAV)) {
         unregister_code(KC_LALT);
         alt_tab_on = false;
+    }
+}
+
+static void nav_press(uint16_t tap_kc, uint16_t alt_kc, keyrecord_t *record) {
+    if (record->event.pressed) {
+        nav_timer   = timer_read();
+        nav_tap_kc  = tap_kc;
+        nav_alt_kc  = alt_kc;
+        nav_holding = false;
+
+        // Check for double-tap: same key tapped recently?
+        if (nav_last_kc == tap_kc && timer_elapsed(nav_last_tap) < NAV_DTAP_MS) {
+            // Double-tap-hold: register key for auto-repeat
+            nav_repeating = true;
+            register_code(tap_kc);
+        } else {
+            nav_repeating = false;
+        }
+    } else {
+        if (nav_repeating) {
+            // Was double-tap-holding: stop repeat
+            unregister_code(nav_tap_kc);
+        } else if (nav_holding) {
+            // Already sent alternate in matrix_scan — nothing to do
+        } else {
+            // Short single tap: send one arrow
+            tap_code(nav_tap_kc);
+        }
+        // Record tap time for double-tap detection
+        nav_last_tap = timer_read();
+        nav_last_kc  = nav_tap_kc;
+        nav_tap_kc   = 0;
+        nav_holding  = false;
+        nav_repeating = false;
     }
 }
 
@@ -345,80 +465,54 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         last_keypress_time = timer_read();
     }
 
-    // Reset nav hold on any other keypress
+    // Num word: cancel on non-number key press
+    if (num_word_active && record->event.pressed && !is_num_word_key(keycode)) {
+        num_word_active = false;
+        layer_off(_NUM);
+        // Don't swallow the key — let it process normally
+    }
+
+    // Reset nav on any other keypress
     if (record->event.pressed && nav_tap_kc &&
         keycode != NAV_LEFT && keycode != NAV_RIGHT &&
         keycode != NAV_UP && keycode != NAV_DOWN &&
         keycode != NAV_BSPC && keycode != NAV_DEL) {
+        unregister_code(nav_tap_kc);
         nav_tap_kc = 0;
     }
 
     switch (keycode) {
-        case NAV_LEFT:
+        // SMART_NUM: tap = num word, hold = momentary _NUM
+        case SMART_NUM:
             if (record->event.pressed) {
-                nav_timer = timer_read(); nav_tap_kc = KC_LEFT; nav_held = false;
-                register_code(KC_LEFT);
+                if (num_word_active) {
+                    // Tap again while num word active → cancel
+                    num_word_active = false;
+                    layer_off(_NUM);
+                } else {
+                    smart_num_held = true;
+                    smart_num_timer = timer_read();
+                    layer_on(_NUM);
+                }
             } else {
-                unregister_code(KC_LEFT);
-                if (nav_held) tap_code(KC_HOME);
-                nav_tap_kc = 0;
+                if (smart_num_held) {
+                    smart_num_held = false;
+                    if (timer_elapsed(smart_num_timer) < TAPPING_TERM) {
+                        // Quick tap: activate num word (keep layer on)
+                        num_word_active = true;
+                    } else {
+                        // Held: momentary, turn off
+                        layer_off(_NUM);
+                    }
+                }
             }
             return false;
-
-        case NAV_RIGHT:
-            if (record->event.pressed) {
-                nav_timer = timer_read(); nav_tap_kc = KC_RIGHT; nav_held = false;
-                register_code(KC_RIGHT);
-            } else {
-                unregister_code(KC_RIGHT);
-                if (nav_held) tap_code(KC_END);
-                nav_tap_kc = 0;
-            }
-            return false;
-
-        case NAV_UP:
-            if (record->event.pressed) {
-                nav_timer = timer_read(); nav_tap_kc = KC_UP; nav_held = false;
-                register_code(KC_UP);
-            } else {
-                unregister_code(KC_UP);
-                if (nav_held) { register_code(KC_LCTL); tap_code(KC_HOME); unregister_code(KC_LCTL); }
-                nav_tap_kc = 0;
-            }
-            return false;
-
-        case NAV_DOWN:
-            if (record->event.pressed) {
-                nav_timer = timer_read(); nav_tap_kc = KC_DOWN; nav_held = false;
-                register_code(KC_DOWN);
-            } else {
-                unregister_code(KC_DOWN);
-                if (nav_held) { register_code(KC_LCTL); tap_code(KC_END); unregister_code(KC_LCTL); }
-                nav_tap_kc = 0;
-            }
-            return false;
-
-        case NAV_BSPC:
-            if (record->event.pressed) {
-                nav_timer = timer_read(); nav_tap_kc = KC_BSPC; nav_held = false;
-                register_code(KC_BSPC);
-            } else {
-                unregister_code(KC_BSPC);
-                if (nav_held) { register_code(KC_LCTL); tap_code(KC_BSPC); unregister_code(KC_LCTL); }
-                nav_tap_kc = 0;
-            }
-            return false;
-
-        case NAV_DEL:
-            if (record->event.pressed) {
-                nav_timer = timer_read(); nav_tap_kc = KC_DEL; nav_held = false;
-                register_code(KC_DEL);
-            } else {
-                unregister_code(KC_DEL);
-                if (nav_held) { register_code(KC_LCTL); tap_code(KC_DEL); unregister_code(KC_LCTL); }
-                nav_tap_kc = 0;
-            }
-            return false;
+        case NAV_LEFT:  nav_press(KC_LEFT, KC_HOME, record);           return false;
+        case NAV_RIGHT: nav_press(KC_RGHT, KC_END, record);            return false;
+        case NAV_UP:    nav_press(KC_UP,   C(KC_HOME), record);        return false;
+        case NAV_DOWN:  nav_press(KC_DOWN, C(KC_END), record);         return false;
+        case NAV_BSPC:  nav_press(KC_BSPC, C(KC_BSPC), record);       return false;
+        case NAV_DEL:   nav_press(KC_DEL,  C(KC_DEL), record);         return false;
 
         case ALT_TAB:
             if (record->event.pressed) {
@@ -430,12 +524,44 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         // QEXCL: tap = ?, shift+tap = ! (urob's qexcl morph)
         case QEXCL:
             if (record->event.pressed) {
-                if (get_mods() & MOD_MASK_SHIFT) {
+                uint8_t mods = get_mods() | get_oneshot_mods();
+                if (mods & MOD_MASK_SHIFT) {
                     del_mods(MOD_MASK_SHIFT);
+                    del_oneshot_mods(MOD_MASK_SHIFT);
                     tap_code16(KC_EXLM);
                     set_mods(get_mods());
                 } else {
                     tap_code16(S(KC_SLSH)); // ?
+                }
+            }
+            return false;
+
+        // LPAR_LT: tap = (, shift+tap = < (urob's lpar_lt morph)
+        case LPAR_LT:
+            if (record->event.pressed) {
+                uint8_t mods = get_mods() | get_oneshot_mods();
+                if (mods & MOD_MASK_SHIFT) {
+                    del_mods(MOD_MASK_SHIFT);
+                    del_oneshot_mods(MOD_MASK_SHIFT);
+                    tap_code16(KC_LABK);
+                    set_mods(get_mods());
+                } else {
+                    tap_code16(KC_LPRN);
+                }
+            }
+            return false;
+
+        // RPAR_GT: tap = ), shift+tap = > (urob's rpar_gt morph)
+        case RPAR_GT:
+            if (record->event.pressed) {
+                uint8_t mods = get_mods() | get_oneshot_mods();
+                if (mods & MOD_MASK_SHIFT) {
+                    del_mods(MOD_MASK_SHIFT);
+                    del_oneshot_mods(MOD_MASK_SHIFT);
+                    tap_code16(KC_RABK);
+                    set_mods(get_mods());
+                } else {
+                    tap_code16(KC_RPRN);
                 }
             }
             return false;
