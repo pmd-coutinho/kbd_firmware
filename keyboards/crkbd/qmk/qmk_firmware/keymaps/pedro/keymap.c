@@ -39,8 +39,8 @@ enum {
 #define CK_CUT  LCTL(KC_X)
 #define CK_COPY LCTL(KC_INS)
 #define CK_PAST LSFT(KC_INS)
-#define DSK_PRV LCTL(LGUI(KC_LEFT))
-#define DSK_NXT LCTL(LGUI(KC_RGHT))
+#define DSK_PRV LGUI(KC_LEFT)
+#define DSK_NXT LGUI(KC_RGHT)
 
 // F-key HRMs (urob puts HRMs on Fn layer too)
 #define HF_F11 LGUI_T(KC_F11)
@@ -61,7 +61,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
     // Base: QWERTY (symbols on combos, mod-morphs on , . /)
     [_DEF] = LAYOUT_split_3x6_3_ex2(
-        XXXXXXX, KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,      KC_MUTE, KC_BTN3,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,    XXXXXXX,
+        XXXXXXX, KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,      KC_MUTE, MS_BTN3,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,    XXXXXXX,
         XXXXXXX, HM_A,    HM_S,    HM_D,    HM_F,    KC_G,      KC_BSLS, KC_GRV,     KC_H,    HM_J,    HM_K,    HM_L,    HM_SC,   KC_QUOT,
         XXXXXXX, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,                             KC_N,    KC_M,    KC_COMM, KC_DOT,  QEXCL,   XXXXXXX,
                                              KC_ESC,  LT_SPC,  LT_ENT,    SMART_NUM, TD_SHFT, KC_DEL
@@ -119,8 +119,7 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 // ---------------------------------------------------------------------------
 // Tap Dance: Sticky Shift / Caps Word
 // ---------------------------------------------------------------------------
-// Single tap = one-shot shift (next key is shifted)
-// Single tap = sticky shift
+// Single tap = sticky shift (one-shot, next key is shifted)
 // Hold = regular shift (stays active while held)
 // Double tap = toggle Caps Word
 void td_sft_cw_finished(tap_dance_state_t *state, void *user_data) {
@@ -207,7 +206,6 @@ enum combo_indices {
     C_UNDER, C_MINUS, C_FSLH, C_PIPE,
     C_CAPSW,
     C_COMP,
-    C_PAD1,
 };
 
 combo_t key_combos[COMBO_COUNT] = {
@@ -227,14 +225,13 @@ combo_t key_combos[COMBO_COUNT] = {
     [C_FSLH]  = COMBO(c_fslh,  KC_SLSH),    [C_PIPE]  = COMBO(c_pipe,  KC_PIPE),
     [C_CAPSW] = COMBO(c_capsw, CW_TOGG),
     [C_COMP]  = COMBO(c_comp,  KC_APP),     // Compose key (Menu key mapped to Compose in OS)
-    [C_PAD1]  = COMBO(c_capsw, KC_NO),
 };
 
 // ---------------------------------------------------------------------------
 // Per-combo idle check (urob's require-prior-idle-ms equivalent)
 // ---------------------------------------------------------------------------
-// Matching urob's exact combo idle values:
-//   ALL horizontal combos: COMBO_IDLE_FAST = 150ms
+// Matching urob's combo idle values:
+//   ALL horizontal combos: COMBO_IDLE_FAST = 125ms
 //   ALL vertical combos:   COMBO_IDLE_SLOW = 50ms
 // ---------------------------------------------------------------------------
 #define COMBO_IDLE_FAST 125
@@ -307,27 +304,26 @@ uint16_t get_combo_term(uint16_t combo_index, combo_t *combo) {
 }
 
 // ---------------------------------------------------------------------------
-// Key Overrides (urob's mod-morphs)
+// Custom Shift Keys (getreuer module — replaces key overrides)
 // ---------------------------------------------------------------------------
-const key_override_t ov_comma = ko_make_basic(MOD_MASK_SHIFT, KC_COMM, KC_SCLN);  // ,→;
-const key_override_t ov_dot   = ko_make_basic(MOD_MASK_SHIFT, KC_DOT,  KC_COLN);  // .→:
-// ?/! morph is handled via custom QEXCL keycode in process_record_user
-const key_override_t ov_bspc  = ko_make_basic(MOD_MASK_SHIFT, KC_BSPC, KC_DEL);   // bspc→del
-
-const key_override_t *key_overrides[] = {
-    &ov_comma, &ov_dot, &ov_bspc, NULL,
+// ?/! and ()/< > morphs are handled via custom keycodes (QEXCL, LPAR_LT, RPAR_GT)
+const custom_shift_key_t custom_shift_keys[] = {
+    {KC_COMM, KC_SCLN},  // , → ;
+    {KC_DOT,  KC_COLN},  // . → :
+    {KC_BSPC, KC_DEL},   // Bspc → Del
 };
+uint8_t NUM_CUSTOM_SHIFT_KEYS = sizeof(custom_shift_keys) / sizeof(*custom_shift_keys);
 
 // ---------------------------------------------------------------------------
 // Encoders
 // ---------------------------------------------------------------------------
 #if defined(ENCODER_MAP_ENABLE)
 const uint16_t PROGMEM encoder_map[][NUM_ENCODERS][NUM_DIRECTIONS] = {
-    [_DEF] = { ENCODER_CCW_CW(KC_VOLD, KC_VOLU),  ENCODER_CCW_CW(KC_WH_U, KC_WH_D) },
-    [_NAV] = { ENCODER_CCW_CW(KC_WH_U, KC_WH_D),  ENCODER_CCW_CW(KC_WH_U, KC_WH_D) },
+    [_DEF] = { ENCODER_CCW_CW(KC_VOLD, KC_VOLU),  ENCODER_CCW_CW(MS_WHLU, MS_WHLD) },
+    [_NAV] = { ENCODER_CCW_CW(MS_WHLU, MS_WHLD),  ENCODER_CCW_CW(MS_WHLU, MS_WHLD) },
     [_FN]  = { ENCODER_CCW_CW(KC_MPRV, KC_MNXT),  ENCODER_CCW_CW(KC_BRID, KC_BRIU)  },
-    [_NUM] = { ENCODER_CCW_CW(KC_WH_U, KC_WH_D),  ENCODER_CCW_CW(KC_WH_U, KC_WH_D) },
-    [_SYS] = { ENCODER_CCW_CW(RGB_VAD, RGB_VAI),  ENCODER_CCW_CW(RGB_HUD, RGB_HUI)  },
+    [_NUM] = { ENCODER_CCW_CW(MS_WHLU, MS_WHLD),  ENCODER_CCW_CW(MS_WHLU, MS_WHLD) },
+    [_SYS] = { ENCODER_CCW_CW(RM_VALD, RM_VALU),  ENCODER_CCW_CW(RM_HUED, RM_HUEU)  },
 };
 #endif
 

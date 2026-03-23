@@ -21,6 +21,7 @@ qmk-init:
 	rm -rf src/qmk/qmk_firmware/modules/getreuer
 	mkdir -p src/qmk/qmk_firmware/modules/getreuer
 	cp -r $(shell pwd)/src/qmk-modules/getreuer/select_word src/qmk/qmk_firmware/modules/getreuer/select_word
+	cp -r $(shell pwd)/src/qmk-modules/getreuer/custom_shift_keys src/qmk/qmk_firmware/modules/getreuer/custom_shift_keys
 
 qmk-compile:
 	$(eval KB := ${kb})

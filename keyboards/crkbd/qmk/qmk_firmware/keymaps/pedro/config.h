@@ -10,7 +10,7 @@
 #define CHORDAL_HOLD
 
 // --- Combos ---
-#define COMBO_COUNT 30
+#define COMBO_COUNT 29
 #define COMBO_TERM 30
 #define COMBO_TERM_PER_COMBO
 // Only fire combo if both keys pressed within COMBO_HOLD_TERM and no key
@@ -31,9 +31,6 @@
 
 // --- Encoders ---
 #define ENCODER_RESOLUTION 4
-
-// --- Nav cluster hold threshold ---
-#define NAV_HOLD_TERM 220
 
 // --- Mouse ---
 #define MK_COMBINED

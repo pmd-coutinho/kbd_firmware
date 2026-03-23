@@ -11,7 +11,8 @@ adapted for QWERTY on the Corne v4.1 Standard.
 | Horizontal combos (Esc, Tab, Bspc, Del, (), [], cut/copy/paste) | QMK combos, per-combo term (50ms horizontal / 30ms vertical) | ✅ |
 | Vertical combos (all symbols: @#$%`\=~^+*&_-/\|) | QMK combos | ✅ |
 | Per-combo require-prior-idle | combo_should_trigger (125ms horizontal / 50ms vertical) | ✅ |
-| Mod-morphs (Shift+,=; Shift+.=: Shift+?=! Shift+(=< Shift+)=>) | Key overrides + custom keycodes | ✅ |
+| Mod-morphs (Shift+,=; Shift+.=: Shift+Bspc=Del) | getreuer/custom_shift_keys module | ✅ |
+| Mod-morphs (Shift+?=! Shift+(=< Shift+)=>) | Custom keycodes (QEXCL, LPAR_LT, RPAR_GT) | ✅ |
 | Nav hold-taps (arrow→Home/End, Bspc→wBspc, Del→wDel) | Custom process_record_user with double-tap-hold repeat | ✅ |
 | Alt-Tab swapper | Custom process_record_user | ✅ |
 | Smart-Num (auto-deactivating num layer) | Num Word: tap=toggle, hold=momentary | ✅ |
@@ -80,7 +81,7 @@ F-keys on left (urob layout), media on right.
 │     │ F12 │ F7  │ F8  │ F9  │     │ │     │Prev │Vol+ │Next │     │     │
 ├─────┼─────┼─────┼─────┼─────┼─────┤ ├─────┼─────┼─────┼─────┼─────┼─────┤
 │     │ F11 │ F4  │ F5  │ F6  │     │ │     │Desk←│Vol- │Desk→│     │     │
-│     │ Gui │ Alt │ Sft │ Ctl │     │ │     │     │     │     │     │     │
+│     │ Gui │ Alt │ Sft │ Ctl │     │ │     │G+←  │     │G+→  │     │     │
 ├─────┼─────┼─────┼─────┼─────┼─────┤ ├─────┼─────┼─────┼─────┼─────┼─────┤
 │     │ F10 │ F1  │ F2  │ F3  │     │ │     │     │     │     │     │     │
 └─────┴─────┴─────┼─────┼─────┼─────┤ ├─────┼─────┼─────┼─────┴─────┴─────┘
@@ -157,7 +158,8 @@ Vertical combos (mid+bot):
 | **Num Word** | Tap num thumb → type numbers freely → auto-exits when you press a non-number key |
 | **Select Word** | NAV bottom-right: SELWBAK/SELLINE/SELLUP/SELWORD for word and line selection |
 | **Nav hold-taps** | Tap=arrow, hold=alternate (Home/End/wBspc/wDel), double-tap-hold=auto-repeat |
-| **Mod-morphs** | Shift+`,`=`;`  Shift+`.`=`:`  Shift+`?`=`!`  Shift+`(`=`<`  Shift+`)`=`>` |
+| **Custom Shift Keys** | Shift+`,`=`;`  Shift+`.`=`:`  Shift+Bspc=Del (via getreuer module) |
+| **Custom mod-morphs** | Shift+`?`=`!`  Shift+`(`=`<`  Shift+`)`=`>` (via custom keycodes) |
 | **Caps Word** | Both shifts or double-tap shift thumb. Allows letters, numbers, `-`, `_`, Bspc |
 | **Sticky shift** | Single tap shift thumb = one-shot shift for next key |
 
