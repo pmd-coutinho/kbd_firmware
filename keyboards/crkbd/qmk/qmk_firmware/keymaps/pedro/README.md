@@ -8,11 +8,13 @@ adapted for QWERTY on the Corne v4.1 Standard.
 | urob ZMK feature | QMK port | Status |
 |---|---|---|
 | Timeless HRMs (balanced + positional + require-prior-idle) | Chordal Hold + Permissive Hold + Flow Tap (150ms) | ✅ |
-| Horizontal combos (Esc, Tab, Bspc, Del, (), [], cut/copy/paste) | QMK combos, per-combo term (50ms horizontal / 30ms vertical) | ✅ |
+| Horizontal combos (Esc, Tab, Bspc, Del, (), [], cut/copy/paste) | QMK combos, per-combo term (35ms horizontal / 30ms vertical) | ✅ |
 | Vertical combos (all symbols: @#$%`\=~^+*&_-/\|) | QMK combos | ✅ |
 | Per-combo require-prior-idle | combo_should_trigger (125ms horizontal / 50ms vertical) | ✅ |
+| Layer-scoped combos (()[] on base, <>{}  on NAV) | combo_should_trigger layer checks | ✅ |
+| HRM combos (hold J+K=Shift+Ctrl, hold K+L=Shift+Alt) | Custom hold-tap on combo output | ✅ |
 | Mod-morphs (Shift+,=; Shift+.=: Shift+Bspc=Del) | getreuer/custom_shift_keys module | ✅ |
-| Mod-morphs (Shift+?=! Shift+(=< Shift+)=>) | Custom keycodes (QEXCL, LPAR_LT, RPAR_GT) | ✅ |
+| Mod-morph (Shift+?=!) | Custom keycode (QEXCL) | ✅ |
 | Nav hold-taps (arrow→Home/End, Bspc→wBspc, Del→wDel) | Custom process_record_user with double-tap-hold repeat | ✅ |
 | Alt-Tab swapper | Custom process_record_user | ✅ |
 | Smart-Num (auto-deactivating num layer) | Num Word: tap=toggle, hold=momentary | ✅ |
@@ -126,16 +128,22 @@ Boot and reset on both halves.
 
 ## Combo map (QWERTY positions)
 
-Horizontal combos use a 50ms combo term; vertical combos use 30ms.
+Horizontal combos use a 35ms combo term; vertical combos use 30ms.
 
 ```
-Horizontal combos:
+Horizontal combos (base/num):
   W+E = Esc       U+I = Bspc
   S+D = Tab       I+O = Del
-  D+F = Compose   J+K = (  [Shift = <]
-  X+C = Copy      K+L = )  [Shift = >]
+  D+F = Compose   J+K = (  [hold = Shift+Ctrl]
+  X+C = Copy      K+L = )  [hold = Shift+Alt]
   C+V = Paste     M+, = [
   X+V = Cut       ,+. = ]
+
+Horizontal combos (NAV layer):
+                   J+K = <
+                   K+L = >
+                   M+, = {
+                   ,+. = }
 
 Vertical combos (top+mid):
   W+S = @    Y+H = ^
@@ -158,8 +166,9 @@ Vertical combos (mid+bot):
 | **Num Word** | Tap num thumb → type numbers freely → auto-exits when you press a non-number key |
 | **Select Word** | NAV bottom-right: SELWBAK/SELLINE/SELLUP/SELWORD for word and line selection |
 | **Nav hold-taps** | Tap=arrow, hold=alternate (Home/End/wBspc/wDel), double-tap-hold=auto-repeat |
-| **Custom Shift Keys** | Shift+`,`=`;`  Shift+`.`=`:`  Shift+Bspc=Del (via getreuer module) |
-| **Custom mod-morphs** | Shift+`?`=`!`  Shift+`(`=`<`  Shift+`)`=`>` (via custom keycodes) |
+| **Custom Shift Keys** | Shift+`,`=`;`  Shift+`.`=`:`  Shift+Bspc=Del  Shift+`?`=`!` |
+| **Layer combos** | Base: `(` `)` `[` `]` — NAV: `<` `>` `{` `}` (same key positions) |
+| **HRM combos** | Hold J+K = Shift+Ctrl, hold K+L = Shift+Alt (tap = parens) |
 | **Caps Word** | Both shifts or double-tap shift thumb. Allows letters, numbers, `-`, `_`, Bspc |
 | **Sticky shift** | Single tap shift thumb = one-shot shift for next key |
 
@@ -186,7 +195,7 @@ kb=crkbd kr=rev4_1/standard km=pedro make qmk-compile
 | `QUICK_TAP_TERM` | config.h | 175ms | Quick tap window for HRMs |
 | `FLOW_TAP_TERM` | config.h | 150ms | Fast typing threshold — keys within this window always tap |
 | `COMBO_TERM` | config.h | 30ms | Vertical combo window |
-| `COMBO_TERM_PER_COMBO` | keymap.c | 50ms | Horizontal combo window (via `get_combo_term()`) |
+| `COMBO_TERM_PER_COMBO` | keymap.c | 35ms | Horizontal combo window (via `get_combo_term()`) |
 | `COMBO_IDLE_FAST` | keymap.c | 125ms | Horizontal combo idle requirement |
 | `COMBO_IDLE_SLOW` | keymap.c | 50ms | Vertical combo idle requirement |
 | `NAV_HOLD_MS` | keymap.c | 200ms | Nav key hold threshold for alternate action |

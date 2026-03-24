@@ -11,7 +11,9 @@ enum layers { _DEF, _NAV, _FN, _NUM, _SYS };
 
 enum custom_keycodes {
     NAV_LEFT = SAFE_RANGE, NAV_RIGHT, NAV_UP, NAV_DOWN,
-    NAV_BSPC, NAV_DEL, ALT_TAB, QEXCL, LPAR_LT, RPAR_GT,
+    NAV_BSPC, NAV_DEL, ALT_TAB, QEXCL,
+    COMBO_LPAR, COMBO_RPAR,  // HRM combos: tap=paren, hold=mods
+    COMBO_TAB,               // HRM combo: tap=tab, hold=Shift+Alt
     SMART_NUM,
 };
 
@@ -198,8 +200,10 @@ enum combo_indices {
     C_ESC, C_TAB,
     C_CUT, C_COPY, C_PASTE,
     C_BSPC, C_DEL,
-    C_LPAR, C_RPAR,
-    C_LBKT, C_RBKT,
+    C_LPAR, C_RPAR,       // DEF+NUM only: ( )
+    C_LBKT, C_RBKT,       // DEF+NUM only: [ ]
+    C_LT, C_GT,           // NAV only: < >
+    C_LBRC, C_RBRC,       // NAV only: { }
     C_AT, C_HASH, C_DLLR, C_PRCNT,
     C_GRAVE, C_BSLH, C_EQUAL, C_TILDE,
     C_CARET, C_PLUS, C_STAR, C_AMPS,
@@ -209,12 +213,14 @@ enum combo_indices {
 };
 
 combo_t key_combos[COMBO_COUNT] = {
-    [C_ESC]   = COMBO(c_esc,   KC_ESC),    [C_TAB]   = COMBO(c_tab,   KC_TAB),
+    [C_ESC]   = COMBO(c_esc,   KC_ESC),    [C_TAB]   = COMBO(c_tab,   COMBO_TAB),
     [C_CUT]   = COMBO(c_cut,   CK_CUT),    [C_COPY]  = COMBO(c_copy,  CK_COPY),
     [C_PASTE] = COMBO(c_paste, CK_PAST),
     [C_BSPC]  = COMBO(c_bspc,  KC_BSPC),   [C_DEL]   = COMBO(c_del,   KC_DEL),
-    [C_LPAR]  = COMBO(c_lpar,  LPAR_LT),   [C_RPAR]  = COMBO(c_rpar,  RPAR_GT),
+    [C_LPAR]  = COMBO(c_lpar,  COMBO_LPAR), [C_RPAR]  = COMBO(c_rpar,  COMBO_RPAR),
     [C_LBKT]  = COMBO(c_lbkt,  KC_LBRC),   [C_RBKT]  = COMBO(c_rbkt,  KC_RBRC),
+    [C_LT]    = COMBO(c_lpar,  KC_LABK),   [C_GT]    = COMBO(c_rpar,  KC_RABK),
+    [C_LBRC]  = COMBO(c_lbkt,  KC_LCBR),   [C_RBRC]  = COMBO(c_rbkt,  KC_RCBR),
     [C_AT]    = COMBO(c_at,    KC_AT),      [C_HASH]  = COMBO(c_hash,  KC_HASH),
     [C_DLLR]  = COMBO(c_dllr,  KC_DLR),    [C_PRCNT] = COMBO(c_prcnt, KC_PERC),
     [C_GRAVE] = COMBO(c_grave, KC_GRV),     [C_BSLH]  = COMBO(c_bslh,  KC_BSLS),
@@ -240,64 +246,62 @@ combo_t key_combos[COMBO_COUNT] = {
 static uint16_t last_keypress_time = 0;
 
 bool combo_should_trigger(uint16_t combo_index, combo_t *combo, uint16_t keycode, keyrecord_t *record) {
+    // Layer-scoped combos: parens/brackets on DEF+NUM, angle/braces on NAV
+    switch (combo_index) {
+        case C_LPAR: case C_RPAR:
+        case C_LBKT: case C_RBKT:
+            if (layer_state_is(_NAV)) return false;
+            break;
+        case C_LT: case C_GT:
+        case C_LBRC: case C_RBRC:
+            if (!layer_state_is(_NAV)) return false;
+            break;
+    }
+
+    // Per-combo idle check
     uint16_t idle;
     switch (combo_index) {
-        // Bksp + Del — short idle, need to be responsive right after typing
-        case C_BSPC:   // U+I
-        case C_DEL:    // I+O
+        // ALL horizontal combos — COMBO_IDLE_FAST (125ms)
+        // Bspc/Del — shorter idle for responsive correction after typing
+        case C_BSPC:   case C_DEL:
             idle = COMBO_IDLE_SLOW;
             break;
 
-        // Other horizontal combos — COMBO_IDLE_FAST (150ms)
-        case C_ESC:    // W+E
-        case C_TAB:    // S+D
-        case C_COMP:   // D+F (Compose)
-        case C_CUT:    // X+V
-        case C_COPY:   // X+C
-        case C_PASTE:  // C+V
-        case C_LPAR:   // J+K
-        case C_RPAR:   // K+L
-        case C_LBKT:   // M+,
-        case C_RBKT:   // ,+.
+        // Other horizontal combos — COMBO_IDLE_FAST (125ms)
+        case C_ESC:    case C_TAB:    case C_COMP:
+        case C_CUT:    case C_COPY:   case C_PASTE:
+        case C_LPAR:   case C_RPAR:   case C_LT:     case C_GT:
+        case C_LBKT:   case C_RBKT:   case C_LBRC:   case C_RBRC:
             idle = COMBO_IDLE_FAST;
             break;
 
         // Vertical combos — COMBO_IDLE_SLOW (50ms)
-        case C_AT:     // W+S
-        case C_HASH:   // E+D
-        case C_DLLR:   // R+F
-        case C_PRCNT:  // T+G
-        case C_GRAVE:  // S+X
-        case C_BSLH:   // D+C
-        case C_EQUAL:  // F+V
-        case C_TILDE:  // G+B
-        case C_CARET:  // Y+H
-        case C_PLUS:   // U+J
-        case C_STAR:   // I+K
-        case C_AMPS:   // O+L
-        case C_UNDER:  // H+N
-        case C_MINUS:  // J+M
-        case C_FSLH:   // K+,
-        case C_PIPE:   // L+.
+        case C_AT:     case C_HASH:   case C_DLLR:   case C_PRCNT:
+        case C_GRAVE:  case C_BSLH:   case C_EQUAL:  case C_TILDE:
+        case C_CARET:  case C_PLUS:   case C_STAR:   case C_AMPS:
+        case C_UNDER:  case C_MINUS:  case C_FSLH:   case C_PIPE:
             idle = COMBO_IDLE_SLOW;
             break;
 
-        // Caps Word and padding — always fire
+        // Caps Word — always fire
         default:
             return true;
     }
     return timer_elapsed(last_keypress_time) >= idle;
 }
 
-// Per-combo timing: horizontal combos get more time (50ms), vertical stay tight (30ms)
+// Per-combo timing: horizontal combos get 35ms, Bspc/Del get 25ms, vertical 30ms
 uint16_t get_combo_term(uint16_t combo_index, combo_t *combo) {
     switch (combo_index) {
+        case C_BSPC:  case C_DEL:
+            return 30;  // Match original timing
         case C_ESC:   case C_TAB:   case C_COMP:
         case C_CUT:   case C_COPY:  case C_PASTE:
         case C_LPAR:  case C_RPAR:
         case C_LBKT:  case C_RBKT:
-        case C_BSPC:  case C_DEL:
-            return 50;
+        case C_LT:    case C_GT:
+        case C_LBRC:  case C_RBRC:
+            return 35;
         default:
             return COMBO_TERM;  // 30ms for vertical combos
     }
@@ -306,11 +310,13 @@ uint16_t get_combo_term(uint16_t combo_index, combo_t *combo) {
 // ---------------------------------------------------------------------------
 // Custom Shift Keys (getreuer module — replaces key overrides)
 // ---------------------------------------------------------------------------
-// ?/! and ()/< > morphs are handled via custom keycodes (QEXCL, LPAR_LT, RPAR_GT)
+// ?/! morph handled via QEXCL keycode; ()/< > handled via layer-scoped combos
 const custom_shift_key_t custom_shift_keys[] = {
-    {KC_COMM, KC_SCLN},  // , → ;
-    {KC_DOT,  KC_COLN},  // . → :
+    {KC_COMM, KC_SCLN},  // , → ;  (Ctrl+Shift bypasses → native <)
+    {KC_DOT,  KC_COLN},  // . → :  (Ctrl+Shift bypasses → native >)
     {KC_BSPC, KC_DEL},   // Bspc → Del
+    {KC_LBRC, KC_LCBR},  // [ → {
+    {KC_RBRC, KC_RCBR},  // ] → }
 };
 uint8_t NUM_CUSTOM_SHIFT_KEYS = sizeof(custom_shift_keys) / sizeof(*custom_shift_keys);
 
@@ -394,6 +400,16 @@ static bool is_num_word_key(uint16_t keycode) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// HRM Combos (urob's hold-tap on paren combos)
+// ---------------------------------------------------------------------------
+// J+K: tap = (, hold = Shift+Ctrl
+// K+L: tap = ), hold = Shift+Alt
+static uint16_t combo_hrm_timer   = 0;
+static uint16_t combo_hrm_tap_kc  = 0;
+static uint8_t  combo_hrm_mods    = 0;
+static bool     combo_hrm_holding = false;
+
 static uint16_t nav_timer      = 0;
 static uint16_t nav_tap_kc     = 0;
 static uint16_t nav_alt_kc     = 0;
@@ -407,6 +423,13 @@ static bool     alt_tab_on     = false;
 #define NAV_DTAP_MS 250  // Max gap between taps for double-tap
 
 void matrix_scan_user(void) {
+    // HRM combo: detect hold threshold — register mods
+    if (combo_hrm_tap_kc && !combo_hrm_holding &&
+        timer_elapsed(combo_hrm_timer) >= TAPPING_TERM) {
+        combo_hrm_holding = true;
+        register_mods(combo_hrm_mods);
+    }
+
     // Detect hold threshold — fire alternate key immediately
     if (nav_tap_kc && !nav_holding && !nav_repeating &&
         timer_elapsed(nav_timer) >= NAV_HOLD_MS) {
@@ -477,6 +500,20 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         nav_tap_kc = 0;
     }
 
+    // Shift+Space = dot + space + sticky shift (sentence ending)
+    // LT_SPC arrives as the layer-tap keycode; tap.count > 0 means it resolved as tap
+    if (keycode == LT_SPC && record->event.pressed && record->tap.count > 0) {
+        uint8_t mods = get_mods() | get_oneshot_mods();
+        if (mods & MOD_MASK_SHIFT) {
+            del_mods(MOD_MASK_SHIFT);
+            del_oneshot_mods(MOD_MASK_SHIFT);
+            tap_code(KC_DOT);
+            tap_code(KC_SPC);
+            set_oneshot_mods(MOD_LSFT);
+            return false;
+        }
+    }
+
     switch (keycode) {
         // SMART_NUM: tap = num word, hold = momentary _NUM
         case SMART_NUM:
@@ -532,33 +569,40 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             }
             return false;
 
-        // LPAR_LT: tap = (, shift+tap = < (urob's lpar_lt morph)
-        case LPAR_LT:
+        // HRM combos: tap = key, hold = mods (urob's combo hold-taps)
+        case COMBO_LPAR:
+        case COMBO_RPAR:
+        case COMBO_TAB:
             if (record->event.pressed) {
-                uint8_t mods = get_mods() | get_oneshot_mods();
-                if (mods & MOD_MASK_SHIFT) {
-                    del_mods(MOD_MASK_SHIFT);
-                    del_oneshot_mods(MOD_MASK_SHIFT);
-                    tap_code16(KC_LABK);
-                    set_mods(get_mods());
+                combo_hrm_timer = timer_read();
+                combo_hrm_holding = false;
+                if (keycode == COMBO_LPAR) {
+                    combo_hrm_tap_kc = KC_LPRN;
+                    combo_hrm_mods   = MOD_BIT(KC_RSFT) | MOD_BIT(KC_RCTL);
+                } else if (keycode == COMBO_RPAR) {
+                    combo_hrm_tap_kc = KC_RPRN;
+                    combo_hrm_mods   = MOD_BIT(KC_RSFT) | MOD_BIT(KC_RALT);
                 } else {
-                    tap_code16(KC_LPRN);
+                    combo_hrm_tap_kc = KC_TAB;
+                    combo_hrm_mods   = MOD_BIT(KC_LSFT) | MOD_BIT(KC_LALT);
                 }
-            }
-            return false;
-
-        // RPAR_GT: tap = ), shift+tap = > (urob's rpar_gt morph)
-        case RPAR_GT:
-            if (record->event.pressed) {
-                uint8_t mods = get_mods() | get_oneshot_mods();
-                if (mods & MOD_MASK_SHIFT) {
-                    del_mods(MOD_MASK_SHIFT);
-                    del_oneshot_mods(MOD_MASK_SHIFT);
-                    tap_code16(KC_RABK);
-                    set_mods(get_mods());
+            } else {
+                if (combo_hrm_holding) {
+                    unregister_mods(combo_hrm_mods);
                 } else {
-                    tap_code16(KC_RPRN);
+                    // Shift morph for parens: Shift+( = <, Shift+) = >
+                    uint16_t kc = combo_hrm_tap_kc;
+                    uint8_t mods = get_mods() | get_oneshot_mods();
+                    if ((kc == KC_LPRN || kc == KC_RPRN) && (mods & MOD_MASK_SHIFT)) {
+                        del_mods(MOD_MASK_SHIFT);
+                        del_oneshot_mods(MOD_MASK_SHIFT);
+                        tap_code16((kc == KC_LPRN) ? KC_LABK : KC_RABK);
+                    } else {
+                        tap_code16(kc);
+                    }
                 }
+                combo_hrm_tap_kc  = 0;
+                combo_hrm_holding = false;
             }
             return false;
     }
