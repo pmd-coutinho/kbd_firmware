@@ -108,6 +108,28 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     ),
 };
 
+// ---------------------------------------------------------------------------
+// Per-layer RGB: solid color override on non-base layers
+// ---------------------------------------------------------------------------
+bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
+    uint8_t layer = get_highest_layer(layer_state | default_layer_state);
+    if (layer == _DEF) return false;  // Let normal animation run
+
+    HSV hsv = {0, 0, rgb_matrix_get_val()};
+    switch (layer) {
+        case _NAV: hsv.h = 140; hsv.s = 255; break;  // Cyan
+        case _FN:  hsv.h = 85;  hsv.s = 255; break;  // Green
+        case _NUM: hsv.h = 32;  hsv.s = 255; break;  // Orange
+        case _SYS: hsv.h = 0;   hsv.s = 255; break;  // Red
+    }
+
+    RGB rgb = hsv_to_rgb(hsv);
+    for (uint8_t i = led_min; i < led_max; i++) {
+        rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
+    }
+    return false;
+}
+
 // Tri-layer: FN + NUM = SYS
 layer_state_t layer_state_set_user(layer_state_t state) {
     state = update_tri_layer_state(state, _FN, _NUM, _SYS);

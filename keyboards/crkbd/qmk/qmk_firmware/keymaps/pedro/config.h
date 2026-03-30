@@ -42,3 +42,4 @@
 
 // --- RGB ---
 #define RGB_MATRIX_DEFAULT_VAL 30
+#define SPLIT_LAYER_STATE_ENABLE
