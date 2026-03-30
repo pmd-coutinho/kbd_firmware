@@ -109,11 +109,32 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 };
 
 // ---------------------------------------------------------------------------
-// Per-layer RGB: solid color override on non-base layers
+// Per-layer RGB: light bound keys, dim transparent/empty keys
 // ---------------------------------------------------------------------------
+#include "keymap_introspection.h"
+static uint8_t led_to_row[RGB_MATRIX_LED_COUNT];
+static uint8_t led_to_col[RGB_MATRIX_LED_COUNT];
+static bool    led_lookup_init = false;
+
+static void init_led_lookup(void) {
+    memset(led_to_row, 0xFF, sizeof(led_to_row));
+    for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
+        for (uint8_t col = 0; col < MATRIX_COLS; col++) {
+            uint8_t led = g_led_config.matrix_co[row][col];
+            if (led < RGB_MATRIX_LED_COUNT) {
+                led_to_row[led] = row;
+                led_to_col[led] = col;
+            }
+        }
+    }
+    led_lookup_init = true;
+}
+
 bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
     uint8_t layer = get_highest_layer(layer_state | default_layer_state);
     if (layer == _DEF) return false;  // Let normal animation run
+
+    if (!led_lookup_init) init_led_lookup();
 
     HSV hsv = {0, 0, rgb_matrix_get_val()};
     switch (layer) {
@@ -122,10 +143,17 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         case _NUM: hsv.h = 32;  hsv.s = 255; break;  // Orange
         case _SYS: hsv.h = 0;   hsv.s = 255; break;  // Red
     }
-
     RGB rgb = hsv_to_rgb(hsv);
+
     for (uint8_t i = led_min; i < led_max; i++) {
-        rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
+        if (led_to_row[i] == 0xFF) continue;
+
+        uint16_t kc = keycode_at_keymap_location(layer, led_to_row[i], led_to_col[i]);
+        if (kc == KC_TRNS || kc == KC_NO) {
+            rgb_matrix_set_color(i, 0, 0, 0);
+        } else {
+            rgb_matrix_set_color(i, rgb.r, rgb.g, rgb.b);
+        }
     }
     return false;
 }
